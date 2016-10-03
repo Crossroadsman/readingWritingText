@@ -8,14 +8,20 @@
 
 import UIKit
 
-enum FileResult {
-    case success
-    case failure(String)
-}
-
 class ViewController: UIViewController {
     
+    enum FileResult {
+        case success
+        case failure(String)
+    }
+    
+    typealias CSVData = [[String:String]]
+    typealias Titles = [String]
+    
     @IBOutlet weak var textView: UITextView!
+    
+    var data: CSVData = []
+    var columnTitles: Titles = []
     
     // MARK: - VC Functions
     // --------------------
@@ -53,6 +59,7 @@ class ViewController: UIViewController {
     }
     
     @IBAction func reportTapped(_ sender: UIButton) {
+        printData(view: textView.text)
     }
 
     
@@ -97,6 +104,76 @@ class ViewController: UIViewController {
         } catch {
             return .failure("ERROR: Unable to write to \(fileName)")
         }
+    }
+    
+    /**
+     eliminates blank lines and
+     converts lines terminated with \r to \n
+     */
+    func cleanRows(file: String) -> String {
+        var cleanFile = file
+        cleanFile = cleanFile.replacingOccurrences(of: "\r", with: "\n")
+        cleanFile = cleanFile.replacingOccurrences(of: "\n\n", with: "\n")
+        return cleanFile
+    }
+    
+    func convertCSV(file: String) -> (Titles, CSVData){
+        
+        var columnTitles: Titles = []
+        var workingData: CSVData = []
+        
+        let rows = cleanRows(file: file).components(separatedBy: "\n")
+        
+        guard rows.count > 0 else {
+            print("No data in file")
+            return (columnTitles, workingData)
+        }
+        
+        columnTitles = getFieldsFor(row: rows.first!, withDelimiter: ",")
+        for row in rows {
+            let fields = getFieldsFor(row: row, withDelimiter: ",")
+            if fields.count != columnTitles.count { continue } // skip rows with the wrong number of fields
+            var dataRow: [String: String] = [:]
+            for (index, field) in fields.enumerated() {
+                let fieldName = columnTitles[index]
+                dataRow[fieldName] = field
+            }
+            workingData += [dataRow]
+        }
+        
+        return (columnTitles, workingData)
+    }
+    
+    func printData(view: String?) {
+        
+        guard let data = view else {
+            print("printdata() was unable to unwrap \(view)")
+            return
+        }
+        
+        let (titles, contents) = convertCSV(file: data)
+        var tableString = ""
+        var rowString = ""
+        print("contents: \(contents)")
+        
+        for row in contents {
+            rowString = ""
+            for fieldName in titles {
+                guard let field = row[fieldName] else {
+                    print("field not found: \(fieldName)")
+                    print("skipping row")
+                    continue
+                }
+                rowString += String(format: "%@     ", field)
+            }
+            tableString += rowString + "\n"
+        }
+        textView.text = tableString
+    }
+
+    
+    func getFieldsFor(row: String, withDelimiter delimiter: String) -> [String]{
+        return row.components(separatedBy: delimiter)
     }
     
 
